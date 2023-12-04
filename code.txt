@@ -1,0 +1,105 @@
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as se
+from tabulate import tabulate
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.model_selection import cross_val_score, train_test_split
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.metrics import classification_report, confusion_matrix
+import nltk
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+import string
+
+# Download NLTK resources
+nltk.download('wordnet')
+nltk.download('stopwords')
+
+# Load the dataset
+tweet = pd.read_csv(r"C:\Users\manan\Downloads\Corona_NLP_test.csv")
+
+
+# Data Information
+tweet
+tweet.info()
+tweet.describe()
+tweet['Sentiment']
+tweet = tweet.drop(['UserName', 'ScreenName', 'Location', 'TweetAt'], axis=1)
+tweet
+# Map sentiment to numerical values
+tweet['positive'] = tweet['Sentiment'].apply(lambda
+                                                 x: 1 if x == 'Positive' else 2 if x == 'Extremely Positive' else -1 if x == 'Negative' else -2 if x == 'Extremely Negative' else 0)
+tweet.hist(bins = 30, figsize = (13,5), color = 'Pink')
+tweet
+tweet.describe()
+tweet.min()
+tweet.max()
+
+
+
+# Clean the tweets
+english = stopwords.words('english')
+lemmatizer = WordNetLemmatizer()
+
+
+def message_cleaning(message):
+    Test_punc_removed = [char for char in message if char not in string.punctuation]
+    Test_punc_removed_join = ''.join(Test_punc_removed)
+    sentence_l = lemmatizer.lemmatize(Test_punc_removed_join)
+
+    Test_punc_removed_join_clean = [word for word in sentence_l.split() if word.lower() not in english]
+    return Test_punc_removed_join_clean
+
+
+tweet_clean = tweet['OriginalTweet'].apply(message_cleaning)
+
+#Grouping Of Various Tweets
+positive = tweet[tweet['positive'] ==1]
+positive
+Ex_positive = tweet[tweet['positive'] ==2]
+Ex_positive
+nutral = tweet[tweet['positive'] ==0]
+nutral
+negative = tweet[tweet['positive'] ==-1]
+negative
+ex_negative = tweet[tweet['positive'] ==-2]
+ex_negative
+
+
+# Vectorize the tweets
+vectorizer = CountVectorizer(analyzer=message_cleaning, dtype=np.uint8)
+tweets_CountVectorizer = vectorizer.fit_transform(tweet['OriginalTweet'])
+
+x = pd.DataFrame(tweets_CountVectorizer.toarray())
+y = tweet['positive']
+
+# Train-test split
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2)
+
+# Create a Multinomial Naive Bayes classifier
+# NB_classifier = MultinomialNB()
+#
+# # Fit the model
+# NB_classifier.fit(x_train, y_train)
+#
+# # Make predictions on the test set
+# y_predict_test = NB_classifier.predict(x_test)
+#
+# # Evaluate the model+
+# cm = confusion_matrix(y_test, y_predict_test)
+# se.heatmap(cm, annot=True)
+# plt.show()
+# print(classification_report(y_test, y_predict_test))
+
+from lazypredict.Supervised import LazyClassifier
+
+clf = LazyClassifier(verbose=0, ignore_warnings=True, custom_metric=None)
+models, predictions = clf.fit(x_train, x_test, y_train, y_test)
+print(models)
+# Apply k-fold cross-validation
+cv_scores = cross_val_score(models, x, y, cv=5, scoring='accuracy')
+print("Cross-validated Accuracy Scores:")
+print(tabulate(cv_scores, headers=['Fold', 'Accuracy'], tablefmt='fancy_grid'))
+print(f"Mean Accuracy: {np.mean(cv_scores)}")
